@@ -1,0 +1,7 @@
+GET     /todos/stats            controllers.TodoController.stats()
+GET     /todos                  controllers.TodoController.list()
+GET     /todos/:id              controllers.TodoController.get(id: Long)
+POST    /todos                  controllers.TodoController.create(request: Request)
+PUT     /todos/:id              controllers.TodoController.update(id: Long, request: Request)
+DELETE  /todos/:id              controllers.TodoController.delete(id: Long)
+GET     /health                 controllers.TodoController.health()

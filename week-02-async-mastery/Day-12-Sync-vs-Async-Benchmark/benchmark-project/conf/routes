@@ -1,0 +1,16 @@
+# Benchmark endpoints
+
+# 1. SYNC: Block default EC thread trực tiếp
+GET     /bench/sync             controllers.BenchmarkController.sync()
+
+# 2. ASYNC WRONG: Async nhưng dùng ForkJoinPool mặc định (vẫn sai)
+GET     /bench/async-wrong      controllers.BenchmarkController.asyncWrong()
+
+# 3. ASYNC RIGHT: Async với custom blocking dispatcher (ĐÚNG)
+GET     /bench/async-right      controllers.BenchmarkController.asyncRight()
+
+# 4. NON-BLOCKING: Thực sự không block (đây là đỉnh cao)
+GET     /bench/non-blocking     controllers.BenchmarkController.nonBlocking()
+
+# Info endpoint
+GET     /bench/info             controllers.BenchmarkController.info()

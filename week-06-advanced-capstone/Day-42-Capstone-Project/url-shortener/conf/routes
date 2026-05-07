@@ -1,0 +1,17 @@
+# URL Shortener Routes
+
+# Auth (public)
+POST    /auth/register          controllers.AuthController.register(request: Request)
+POST    /auth/login             controllers.AuthController.login(request: Request)
+
+# URL management (requires JWT)
+GET     /api/urls               controllers.UrlController.list(request: Request)
+POST    /api/urls               controllers.UrlController.create(request: Request)
+GET     /api/urls/:code/stats   controllers.UrlController.stats(code: String, request: Request)
+DELETE  /api/urls/:code         controllers.UrlController.delete(code: String, request: Request)
+
+# Health check
+GET     /health                 controllers.UrlController.health()
+
+# Redirect - PHẢI ở cuối vì /:code match tất cả
+GET     /:code                  controllers.RedirectController.redirect(code: String)

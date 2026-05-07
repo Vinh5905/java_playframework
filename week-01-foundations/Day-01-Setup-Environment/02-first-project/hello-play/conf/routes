@@ -1,0 +1,12 @@
+# Routes
+# Format: HTTP_METHOD   URL_PATTERN   CONTROLLER_CLASS.METHOD
+# ~~~~
+
+# Trang chủ
+GET     /                           controllers.HomeController.index()
+
+# Bài tập Day 01: thêm route này sau khi hiểu cơ bản
+GET     /hello                      controllers.HomeController.hello()
+
+# Static assets - bắt buộc phải có nếu dùng public/ folder
+GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
