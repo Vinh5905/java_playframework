@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/hoangvinh/Library/CloudStorage/OneDrive-Personal/Workspace/learn_playframework/chat-project/your-project/fe/css /Users/hoangvinh/Library/CloudStorage/OneDrive-Personal/Workspace/learn_playframework/chat-project/your-project/fe/js)",
+      "Bash(mkdir -p /Users/hoangvinh/Library/CloudStorage/OneDrive-Personal/Workspace/learn_playframework/chat-project/full-project/fe/css /Users/hoangvinh/Library/CloudStorage/OneDrive-Personal/Workspace/learn_playframework/chat-project/full-project/fe/js)"
+    ]
+  }
+}

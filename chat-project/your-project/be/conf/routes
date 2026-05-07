@@ -1,0 +1,27 @@
+# Routes - Chat Backend
+# Thêm routes dần theo hướng dẫn từng tuần
+
+# ── Health Check (Tuần 1) ────────────────────────────────────
+GET     /health                         controllers.AccountController.health()
+
+# ── Accounts API (Tuần 1) ────────────────────────────────────
+# QUAN TRỌNG: /current phải trước /:id để tránh conflict!
+GET     /api/accounts/current           controllers.AccountController.current()
+GET     /api/accounts                   controllers.AccountController.list()
+POST    /api/accounts/switch/:id        controllers.AccountController.switchTo(id: Long)
+
+# ── Conversations & Messages (Tuần 3) ────────────────────────
+# GET  /api/conversations                   controllers.ConversationController.list()
+# GET  /api/conversations/:convId/messages  controllers.MessageController.getMessages(convId: String, limit: Int ?= 20)
+# POST /api/conversations/:convId/messages  controllers.MessageController.sendMessage(convId: String, request: Request)
+
+# ── WebSocket (Tuần 4) ───────────────────────────────────────
+# GET  /ws/chat                         controllers.WebSocketController.chat(request: Request)
+# GET  /ws/global                       controllers.GlobalChatController.join(request: Request)
+
+# ── Presence (Tuần 5) ────────────────────────────────────────
+# GET  /api/presence                    controllers.AccountController.presence()
+
+# ── Settings (Tuần 8) ────────────────────────────────────────
+# GET  /api/settings                    controllers.SettingsController.getSettings(userId: Long)
+# PATCH /api/settings                   controllers.SettingsController.updateSetting(userId: Long, request: Request)
