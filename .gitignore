@@ -1,0 +1,40 @@
+# ─── sbt build outputs ───────────────────────────────────────
+target/
+project/target/
+project/project/target/
+
+# ─── Metals (Scala/Java LSP cho VSCode) ──────────────────────
+.metals/
+.bloop/
+project/.bloop/
+project/metals.sbt
+
+# ─── IntelliJ IDEA ───────────────────────────────────────────
+.idea/
+*.iml
+out/
+
+# ─── VSCode ──────────────────────────────────────────────────
+.vscode/
+
+# ─── Java artifacts ──────────────────────────────────────────
+*.class
+*.jar
+*.war
+
+# ─── macOS ───────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ─── Logs ────────────────────────────────────────────────────
+logs/
+*.log
+
+# ─── Play Framework specific ─────────────────────────────────
+RUNNING_PID
+
+# ─── Environment / secrets ───────────────────────────────────
+.env
+.env.local
+application.secret

@@ -7,6 +7,7 @@ lazy val root = (project in file("."))
   .enablePlugins(PlayJava, DockerPlugin)
 
 scalaVersion := "2.13.16"
+javacOptions ++= Seq("--release", "21")
 
 libraryDependencies ++= Seq(
   guice,
@@ -24,5 +25,5 @@ libraryDependencies ++= Seq(
 )
 
 // Docker settings
-dockerBaseImage := "eclipse-temurin:17-jre-alpine"
+dockerBaseImage := "eclipse-temurin:21-jre-alpine"
 dockerExposedPorts := Seq(9000)
