@@ -1,8 +1,9 @@
-# Day 37 - Configuration & Logging
+# Day 37 - Configuration, Logging & I18N
 
 ## Mục tiêu
 - HOCON config sâu hơn (includes, substitutions, environment)
 - Structured logging với Logback
+- Internationalization (i18n) - đa ngôn ngữ
 - Log levels và production logging
 
 ---
@@ -164,7 +165,54 @@ public class UserService {
 
 ---
 
-## 5. Log Levels
+## 5. Log Markers - Enrichment & Filtering
+
+Markers cho phép thêm metadata vào log và filter theo marker:
+
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
+
+public class PaymentService {
+    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
+
+    // Định nghĩa markers
+    private static final Marker PAYMENT = MarkerFactory.getMarker("PAYMENT");
+    private static final Marker SECURITY = MarkerFactory.getMarker("SECURITY");
+
+    public void processPayment(String orderId, BigDecimal amount) {
+        // Log với marker - dễ filter trong log aggregator
+        log.info(PAYMENT, "Processing payment orderId={} amount={}", orderId, amount);
+    }
+
+    public void fraudDetected(String userId) {
+        log.warn(SECURITY, "Fraud detected for userId={}", userId);
+    }
+}
+```
+
+```xml
+<!-- logback.xml: Filter chỉ ghi SECURITY markers vào file riêng -->
+<appender name="SECURITY_FILE" class="ch.qos.logback.core.FileAppender">
+    <file>/var/log/security.log</file>
+    <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+        <evaluator class="ch.qos.logback.classic.boolex.OnMarkerEvaluator">
+            <marker>SECURITY</marker>
+        </evaluator>
+        <onMatch>ACCEPT</onMatch>
+        <onMismatch>DENY</onMismatch>
+    </filter>
+    <encoder><pattern>%date [%level] %message%n</pattern></encoder>
+</appender>
+```
+
+> **Lưu ý**: `play.Logger` static methods đã bị **deprecated từ Play 2.7+**. Luôn dùng `LoggerFactory.getLogger(MyClass.class)` từ SLF4J.
+
+---
+
+## 6. Log Levels
 
 | Level | Dùng khi |
 |-------|---------|
@@ -175,3 +223,118 @@ public class UserService {
 | TRACE | Rất chi tiết (chỉ dùng khi debug cụ thể) |
 
 **Production**: INFO level cho app, WARN cho thư viện
+
+---
+
+## 7. Internationalization (I18N) - Đa Ngôn Ngữ
+
+### 7.1 Cấu hình ngôn ngữ
+
+```hocon
+# application.conf
+play.i18n.langs = ["en", "vi", "fr"]
+```
+
+### 7.2 Message Files
+
+```
+conf/
+├── messages           ← Default (fallback cho tất cả)
+├── messages.en        ← Tiếng Anh
+├── messages.vi        ← Tiếng Việt
+└── messages.fr        ← Tiếng Pháp
+```
+
+```properties
+# conf/messages (default)
+hello=Hello
+welcome=Welcome, {0}!
+items.count=You have {0} items
+
+# conf/messages.vi
+hello=Xin chào
+welcome=Chào mừng, {0}!
+items.count=Bạn có {0} mục
+```
+
+> **Lưu ý**: Dùng `{0}`, `{1}` cho parameter substitution (java.text.MessageFormat). Dấu nháy đơn `'` là escape character - dùng `''` để hiển thị literal apostrophe.
+
+### 7.3 Dùng MessagesApi Trong Controller
+
+```java
+import play.i18n.MessagesApi;
+import play.i18n.Messages;
+import play.i18n.Lang;
+
+public class HomeController extends Controller {
+
+    private final MessagesApi messagesApi;
+
+    @Inject
+    public HomeController(MessagesApi messagesApi) {
+        this.messagesApi = messagesApi;
+    }
+
+    public Result index(Http.Request request) {
+        // Tự động negotiate từ Accept-Language header + PLAY_LANG cookie
+        Messages messages = messagesApi.preferred(request);
+
+        String greeting = messages.at("hello");
+        String welcome = messages.at("welcome", "Alice");  // → "Welcome, Alice!"
+
+        return ok(Json.newObject()
+            .put("greeting", greeting)
+            .put("welcome", welcome));
+    }
+
+    // Chỉ định ngôn ngữ tường minh
+    public Result french(Http.Request request) {
+        Messages messages = messagesApi.preferred(List.of(Lang.forCode("fr")));
+        return ok(messages.at("hello"));
+    }
+}
+```
+
+### 7.4 Language Negotiation (Thứ Tự Ưu Tiên)
+
+```
+1. request.withTransientLang(lang)  ← Explicit trong code
+2. Cookie "PLAY_LANG"               ← User preference đã lưu
+3. Accept-Language header           ← Browser preference
+4. play.i18n.langs[0]              ← Default của app
+```
+
+### 7.5 Đổi Ngôn Ngữ
+
+```java
+// Tạm thời (chỉ request này)
+Http.Request localizedRequest = request.withTransientLang(Lang.forCode("vi"));
+
+// Vĩnh viễn (lưu vào cookie cho requests sau)
+public Result setLanguage(Http.Request request, String lang) {
+    Lang newLang = Lang.forCode(lang);
+    return redirect(routes.HomeController.index())
+        .withLang(newLang, messagesApi);
+    // → Set cookie PLAY_LANG=vi
+}
+```
+
+### 7.6 I18N Trong Twirl Templates
+
+```html
+@* Template nhận Messages object *@
+@()(implicit messages: Messages)
+
+<h1>@messages("hello")</h1>
+<p>@messages("welcome", user.name)</p>
+
+@* Shorthand *@
+<p>@Messages("hello")</p>
+```
+
+```java
+// Controller truyền implicit messages
+public Result show(Http.Request request) {
+    Messages messages = messagesApi.preferred(request);
+    return ok(views.html.index.render(messages));
+}

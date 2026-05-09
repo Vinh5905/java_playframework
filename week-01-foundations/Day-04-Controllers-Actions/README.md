@@ -346,7 +346,86 @@ public class LoggingAction extends Action.Simple {
 
 ---
 
-## 9. Bài Tập
+## 9. Lỗi Nghiêm Trọng: Action Phải Là Instance Mới Mỗi Request
+
+> **"Every request must be served by a distinct instance of your `play.mvc.Action`."**
+
+```java
+// ❌ SAI - Singleton Action: tất cả request dùng chung instance
+@Singleton
+public class AuthenticatedAction extends Action.Simple {
+    // State được share giữa các requests → race conditions!
+    private String currentUserId;  // NGUY HIỂM
+
+    @Override
+    public CompletionStage<Result> call(Http.Request request) {
+        currentUserId = extractUserId(request);  // Thread unsafe!
+        return delegate.call(request);
+    }
+}
+
+// ✅ ĐÚNG - Không có @Singleton: mỗi request = 1 instance mới
+public class AuthenticatedAction extends Action.Simple {
+    @Override
+    public CompletionStage<Result> call(Http.Request request) {
+        // Dùng biến local hoặc request.addAttr() để truyền data
+        String userId = extractUserId(request);
+        Http.Request enriched = request.addAttr(Security.USER_ID_KEY, userId);
+        return delegate.call(enriched);
+    }
+}
+```
+
+**Quy tắc**: Action class **KHÔNG BAO GIỜ** có `@Singleton`. Nếu cần dependency, inject qua constructor - Guice tạo instance mới mỗi lần.
+
+---
+
+## 10. Deferred Body Parsing (Parse Sau Auth)
+
+Mặc định, Play parse request body TRƯỚC khi chạy action composition. Điều này gây lãng phí nếu request bị từ chối ở auth layer.
+
+```java
+// Cấu hình body parse SAU action composition
+// application.conf:
+// play.http.actionComposition.executeActionCreatorActionFirst = false
+
+// Trong Action: chỉ parse body sau khi đã auth thành công
+public class AuthAction extends Action<Auth> {
+    @Override
+    public CompletionStage<Result> call(Http.Request request) {
+        if (!isAuthenticated(request)) {
+            return CompletableFuture.completedFuture(Results.unauthorized());
+            // Body không được parse → tiết kiệm tài nguyên
+        }
+        return delegate.call(request);  // Parse body ở đây
+    }
+}
+```
+
+---
+
+## 11. Controller-Level vs Method-Level Annotation Thứ Tự
+
+```java
+// Khi cả class và method đều có @With
+// Mặc định: method annotation chạy TRƯỚC class annotation
+@With(LoggingAction.class)  // Class level
+public class MyController extends Controller {
+
+    @With(AuthAction.class)  // Method level
+    public Result secure() {
+        // Thứ tự mặc định: AuthAction → LoggingAction
+    }
+}
+
+// Đổi thứ tự trong application.conf:
+// play.http.actionComposition.controllerAnnotationsFirst = true
+// → LoggingAction → AuthAction
+```
+
+---
+
+## 12. Bài Tập
 
 Xem code thực hành trong `controllers-actions-demo/`:
 

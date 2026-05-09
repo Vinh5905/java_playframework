@@ -103,7 +103,55 @@ curl -X POST http://localhost:9000/todos \
 
 ---
 
-## 4. CORS: Chặn Unauthorized Cross-Origin
+## 4. CSRF: Per-Action Annotations & Testing
+
+```java
+// @AddCSRFToken: Tạo token nếu chưa có (cho GET pages với forms)
+@AddCSRFToken
+public Result showForm(Http.Request request) {
+    // Đảm bảo token có trong session để form có thể dùng
+    CSRF.Token token = CSRF.getToken(request).orElseThrow();
+    return ok(views.html.myForm.render(token.value()));
+}
+
+// @RequireCSRFCheck: Bắt buộc verify CSRF token cho action này
+@RequireCSRFCheck
+public Result submitForm(Http.Request request) {
+    // Play sẽ trả 403 nếu CSRF token không hợp lệ
+    return ok("Form submitted");
+}
+```
+
+**Test với CSRF:**
+```java
+// Trong functional tests - thêm CSRF token vào fake request
+import play.test.CSRFTokenHelper;
+
+@Test
+void testFormSubmit() {
+    Http.RequestBuilder requestBuilder = Helpers.fakeRequest("POST", "/form")
+        .bodyForm(Map.of("title", "Test"));
+
+    // Thêm CSRF token để test không bị reject
+    Http.Request request = CSRFTokenHelper.addCSRFToken(requestBuilder).build();
+    Result result = route(app, request);
+    assertEquals(200, result.status());
+}
+```
+
+**Config options:**
+```hocon
+play.filters.csrf {
+  token.name = "csrfToken"        # Tên field
+  cookie.name = "PLAY_CSRF_TOKEN" # Lưu trong cookie thay vì session
+  token.sign = true               # Signed tokens chống BREACH attack
+  body.bufferSize = 100k          # Max body để check token
+}
+```
+
+---
+
+## 5. CORS: Chặn Unauthorized Cross-Origin
 
 ```hocon
 play.filters.cors {

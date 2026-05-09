@@ -153,7 +153,99 @@ void testWithMockRepository() {
 
 ---
 
-## 7. Named Bindings
+## 7. ApplicationLifecycle - Cleanup Khi App Dừng
+
+```java
+import play.inject.ApplicationLifecycle;
+import java.util.concurrent.CompletableFuture;
+
+@Singleton
+public class DatabasePool {
+
+    private final HikariDataSource dataSource;
+
+    @Inject
+    public DatabasePool(ApplicationLifecycle lifecycle, Config config) {
+        this.dataSource = createPool(config);
+
+        // Đăng ký stop hook - chạy khi app shutdown
+        lifecycle.addStopHook(() -> {
+            dataSource.close();  // Đóng connection pool
+            return CompletableFuture.completedFuture(null);
+        });
+    }
+}
+
+@Singleton
+public class BackgroundWorker {
+
+    private final ScheduledExecutorService executor;
+
+    @Inject
+    public BackgroundWorker(ApplicationLifecycle lifecycle) {
+        this.executor = Executors.newScheduledThreadPool(2);
+
+        // Cleanup khi app dừng
+        lifecycle.addStopHook(() -> {
+            executor.shutdown();
+            return CompletableFuture.completedFuture(null);
+        });
+    }
+}
+```
+
+> **Thứ tự stop**: Components stop theo thứ tự NGƯỢC lại khi tạo. Nếu A được tạo trước B, B sẽ stop trước A.
+
+---
+
+## 8. Provider Pattern - Giải Circular Dependencies
+
+```java
+import com.google.inject.Provider;
+
+// Vấn đề: A cần B, B cần A → circular dependency
+// Giải pháp: Inject Provider<B> vào A, defer instantiation
+
+public class ServiceA {
+    private final Provider<ServiceB> serviceBProvider;
+
+    @Inject
+    public ServiceA(Provider<ServiceB> serviceBProvider) {
+        this.serviceBProvider = serviceBProvider;  // Không tạo B ngay
+    }
+
+    public void doWork() {
+        ServiceB b = serviceBProvider.get();  // B được tạo lazily khi cần
+        b.execute();
+    }
+}
+```
+
+---
+
+## 9. @ImplementedBy - Binding Đơn Giản Không Cần Module
+
+```java
+// Thay vì viết Module để bind interface → impl
+// Dùng @ImplementedBy trực tiếp trên interface
+
+import com.google.inject.ImplementedBy;
+
+@ImplementedBy(UserRepositoryImpl.class)
+public interface UserRepository {
+    CompletionStage<Optional<User>> findById(Long id);
+    CompletionStage<User> save(User user);
+}
+
+// Guice tự động bind UserRepository → UserRepositoryImpl
+// Không cần AppModule.configure()
+```
+
+> **Khi nào dùng `@ImplementedBy` vs Module**: `@ImplementedBy` cho binding đơn giản. Module khi cần scope, qualifiers, hoặc `@Provides`.
+
+---
+
+## 10. Named Bindings
 
 ```java
 // Khi cần nhiều implementation của cùng interface
@@ -180,3 +272,49 @@ public class UserService {
     private CacheService cache;
 }
 ```
+
+---
+
+## 11. Compile-Time DI (Nâng Cao)
+
+Play hỗ trợ **Compile-Time DI** - wiring được kiểm tra lúc compile, không phải runtime:
+
+```java
+// app/AppLoader.java - ApplicationLoader thay thế Guice
+public class AppLoader implements ApplicationLoader {
+    @Override
+    public Application load(Context context) {
+        return new AppComponents(context).application();
+    }
+}
+
+// app/AppComponents.java - Wiring tường minh
+public class AppComponents extends BuiltInComponentsFromContext
+        implements HttpFiltersComponents {
+
+    public AppComponents(ApplicationLoader.Context context) {
+        super(context);
+        // Wiring xảy ra ở đây, fail nhanh nếu thiếu dependency
+    }
+
+    // Manually wire dependencies
+    @Override
+    public Router router() {
+        UserRepository repo = new UserRepositoryImpl(dbApi());
+        UserController controller = new UserController(repo);
+        return new _root_.router.Routes(httpErrorHandler(), controller);
+    }
+}
+```
+
+```hocon
+# application.conf - Dùng AppLoader thay Guice
+play.application.loader = "AppLoader"
+```
+
+**Khi nào dùng Compile-Time DI:**
+- Muốn lỗi wiring được phát hiện sớm (compile time, không phải startup)
+- Team muốn dependency graph rõ ràng
+- Không thích annotation magic
+
+**Tradeoff**: Boilerplate nhiều hơn, nhưng an toàn hơn runtime DI.

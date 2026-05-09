@@ -192,7 +192,134 @@ public Result create(Http.Request request) {
 
 ---
 
-## 6. Bài Tập
+## 6. Cross-Field Validation với `@Validate`
+
+Khi cần validate liên quan đến nhiều field:
+
+```java
+import play.data.validation.Constraints.Validate;
+import play.data.validation.Constraints.Validatable;
+
+@Validate
+public class PasswordChangeForm implements Validatable<String> {
+    @Constraints.Required
+    public String newPassword;
+
+    @Constraints.Required
+    public String confirmPassword;
+
+    @Override
+    public String validate() {
+        if (!newPassword.equals(confirmPassword)) {
+            return "Passwords do not match";
+        }
+        if (newPassword.length() < 8) {
+            return "Password must be at least 8 characters";
+        }
+        return null;  // null = valid
+    }
+}
+
+// Hoặc trả ValidationError để gắn lỗi vào field cụ thể
+@Validate
+public class RegistrationForm implements Validatable<ValidationError> {
+    public String username;
+    public String email;
+
+    @Override
+    public ValidationError validate() {
+        if (username != null && username.equals(email)) {
+            return new ValidationError("username", "Username cannot be the same as email");
+        }
+        return null;
+    }
+}
+```
+
+---
+
+## 7. Validation Groups (Partial Validation)
+
+Validate chỉ một phần constraints - hữu ích khi cùng class dùng cho nhiều operation:
+
+```java
+// Định nghĩa groups
+public interface SignUpCheck {}
+public interface UpdateCheck {}
+
+public class UserForm {
+    @Constraints.Required(groups = SignUpCheck.class)
+    public String email;
+
+    @Constraints.Required(groups = {SignUpCheck.class, UpdateCheck.class})
+    public String name;
+
+    // Chỉ required khi sign up, không required khi update
+    @Constraints.Required(groups = SignUpCheck.class)
+    public String password;
+}
+
+// Controller - chỉ validate SignUpCheck group
+public Result register(Http.Request request) {
+    Form<UserForm> form = formFactory
+        .form(UserForm.class, SignUpCheck.class)  // Chỉ check group này
+        .bindFromRequest(request);
+
+    if (form.hasErrors()) {
+        return badRequest(form.errorsAsJson());
+    }
+    // ...
+}
+```
+
+---
+
+## 8. Form Fill (Prepopulate Cho Edit)
+
+```java
+// Controller edit - fill form với data hiện tại
+public Result edit(Http.Request request, Long id) {
+    User user = userRepo.findById(id);
+
+    UserForm formData = new UserForm();
+    formData.name = user.getName();
+    formData.email = user.getEmail();
+
+    // fill() tạo form mới với data được điền sẵn
+    Form<UserForm> filledForm = formFactory
+        .form(UserForm.class)
+        .fill(formData);
+
+    return ok(views.html.user.edit.render(filledForm));
+}
+```
+
+---
+
+## 9. DynamicForm - Form Không Biết Trước Fields
+
+```java
+import play.data.DynamicForm;
+
+public Result handleDynamic(Http.Request request) {
+    DynamicForm dynamicForm = formFactory.form().bindFromRequest(request);
+
+    // Lấy value theo tên field
+    String username = dynamicForm.get("username");
+    String email = dynamicForm.get("email");
+
+    // Kiểm tra lỗi
+    if (dynamicForm.hasErrors()) {
+        return badRequest(dynamicForm.errorsAsJson());
+    }
+
+    return ok("Got: " + username + ", " + email);
+}
+```
+
+---
+
+## 10. Bài Tập
 
 Thêm validation vào Todo API từ Day 07/14:
 

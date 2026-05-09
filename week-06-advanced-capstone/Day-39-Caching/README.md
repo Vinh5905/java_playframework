@@ -154,7 +154,99 @@ docker run -d --name redis -p 6379:6379 redis:7-alpine
 
 ---
 
-## 6. Bài Tập
+## 6. Named Caches - Nhiều Cache Instance
+
+```java
+import play.cache.NamedCache;
+
+// application.conf
+// play.cache.bindCaches = ["user-cache", "product-cache", "session-cache"]
+
+public class UserService {
+
+    private final AsyncCacheApi userCache;
+    private final AsyncCacheApi productCache;
+
+    @Inject
+    public UserService(
+        @NamedCache("user-cache") AsyncCacheApi userCache,
+        @NamedCache("product-cache") AsyncCacheApi productCache
+    ) {
+        this.userCache = userCache;
+        this.productCache = productCache;
+    }
+
+    public CompletionStage<User> getUser(Long id) {
+        return userCache.getOrElseUpdate("user:" + id, () -> userRepo.findById(id), 300);
+    }
+
+    public CompletionStage<Product> getProduct(Long id) {
+        return productCache.getOrElseUpdate("product:" + id, () -> productRepo.findById(id), 3600);
+    }
+}
+```
+
+**Cấu hình Caffeine per named cache:**
+```hocon
+play.cache.caffeine.caches {
+  user-cache {
+    initial-capacity = 200
+    maximum-size = 10000
+    expire-after-write = 10m
+  }
+  product-cache {
+    maximum-size = 5000
+    expire-after-write = 1h
+  }
+}
+```
+
+---
+
+## 7. Caffeine - Default Cache Implementation
+
+Từ Play 3.x, **Caffeine** là implementation mặc định (thay EhCache):
+
+```scala
+// build.sbt
+libraryDependencies += cacheApi
+// Caffeine được include tự động
+```
+
+```hocon
+# application.conf - Caffeine config
+play.cache.caffeine.defaults {
+  initial-capacity = 100
+  maximum-size = 500
+  expire-after-write = 1h
+}
+```
+
+**Tại sao Caffeine tốt hơn EhCache 2.x:**
+- Throughput cao hơn (Window TinyLFU algorithm)
+- Memory footprint nhỏ hơn
+- Không cần file config XML
+
+---
+
+## 8. Custom Dispatcher Cho Cache
+
+Nếu cache implementation có blocking I/O (Redis network calls), cần tách khỏi default dispatcher:
+
+```hocon
+# application.conf
+play.cache.dispatcher = "contexts.cache-dispatcher"
+
+contexts.cache-dispatcher {
+  fork-join-executor {
+    parallelism-max = 20
+  }
+}
+```
+
+---
+
+## 9. Bài Tập
 
 1. Cache kết quả query `GET /todos` với TTL 30 giây
 2. Invalidate cache khi tạo/sửa/xóa todo

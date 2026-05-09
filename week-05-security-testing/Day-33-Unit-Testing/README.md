@@ -230,7 +230,53 @@ void testRouting() {
 
 ---
 
-## 6. Bài Tập
+## 6. GuiceApplicationBuilder Nâng Cao
+
+```java
+// Disable module không cần trong test
+Application app = new GuiceApplicationBuilder()
+    .disable(EmailModule.class)           // Tắt email service
+    .configure("db.default.url", "jdbc:h2:mem:test")
+    .build();
+
+// Override nhiều bindings
+Application app = new GuiceApplicationBuilder()
+    .overrides(
+        bind(EmailService.class).to(MockEmailService.class),
+        bind(UserRepository.class).toInstance(mockRepo),
+        bind(Clock.class).toInstance(Clock.fixed(instant, ZoneId.of("UTC")))
+    )
+    .build();
+
+// Load specific module thay vì auto-discover
+Application app = new GuiceApplicationBuilder()
+    .load(new TestModule())  // Chỉ load TestModule
+    .build();
+```
+
+**GuiceInjectorBuilder - Test đơn giản không cần full app:**
+
+```java
+import play.inject.guice.GuiceInjectorBuilder;
+
+@Test
+void testServiceDirectly() {
+    // Không cần khởi tạo full Play application
+    Injector injector = new GuiceInjectorBuilder()
+        .overrides(bind(UserRepository.class).toInstance(mockRepo))
+        .injector();
+
+    UserService service = injector.instanceOf(UserService.class);
+
+    // Test service trực tiếp
+    User result = service.findById(1L).toCompletableFuture().join();
+    assertNotNull(result);
+}
+```
+
+---
+
+## 7. Bài Tập
 
 1. Viết unit tests cho TodoController từ Day 14
 2. Test tất cả happy paths: list, get, create, update, delete

@@ -176,7 +176,36 @@ public CompletionStage<Result> create(Http.Request request) {
 
 ---
 
-## 5. Bài Tập
+## 5. Built-in Error Handlers (Không Cần Custom)
+
+Play có sẵn các error handler cho nhiều use case:
+
+```hocon
+# application.conf
+
+# Option 1: JSON error handler (REST API thuần)
+play.http.errorHandler = "play.http.JsonHttpErrorHandler"
+# → Tất cả lỗi (404, 500, etc.) đều trả JSON
+
+# Option 2: Smart handler - HTML cho browser, JSON cho API client
+play.http.errorHandler = "play.http.HtmlOrJsonHttpErrorHandler"
+# → Nếu Accept: text/html → HTML error page
+# → Nếu Accept: application/json → JSON error
+
+# Option 3: Custom handler (xem Section 1 ở trên)
+play.http.errorHandler = "ErrorHandler"
+```
+
+**Khi nào dùng built-in vs custom:**
+| Trường hợp | Giải pháp |
+|-----------|-----------|
+| REST API thuần | `JsonHttpErrorHandler` |
+| Hybrid app (HTML + API) | `HtmlOrJsonHttpErrorHandler` |
+| Custom error format / logging | Extend `DefaultHttpErrorHandler` |
+
+---
+
+## 6. Bài Tập
 
 1. Setup global error handler trả JSON (không HTML)
 2. Test: curl URL không tồn tại → JSON 404

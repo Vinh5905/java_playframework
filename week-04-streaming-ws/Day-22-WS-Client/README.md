@@ -157,7 +157,75 @@ play.ws {
 
 ---
 
-## 6. Bài Tập
+## 6. HTTP Authentication
+
+```java
+// Basic Auth
+ws.url("https://api.example.com/protected")
+    .setAuth("username", "password", WSAuthScheme.BASIC)
+    .get();
+
+// Các scheme khác: DIGEST, KERBEROS, NTLM, SPNEGO
+ws.url("https://enterprise.example.com/api")
+    .setAuth("user", "pass", WSAuthScheme.DIGEST)
+    .get();
+```
+
+---
+
+## 7. Multipart Form Data (File Upload Đến API Ngoài)
+
+```java
+import play.libs.ws.WSRequest;
+import akka.stream.javadsl.Source;
+
+public CompletionStage<JsonNode> uploadFile(File file) {
+    return ws.url("https://upload.example.com/files")
+        .post(Source.from(Arrays.asList(
+            Http.MultipartFormData.DataPart.create("description", "My file"),
+            Http.MultipartFormData.FilePart.create(
+                "file",                    // field name
+                file.getName(),            // filename
+                "application/octet-stream",
+                FileIO.fromPath(file.toPath())
+            )
+        )))
+        .thenApply(WSResponse::asJson);
+}
+```
+
+---
+
+## 8. Streaming Large Response (Không Load Vào RAM)
+
+`get()` load toàn bộ body vào memory. Với file lớn, dùng `stream()`:
+
+```java
+import akka.stream.Materializer;
+import akka.stream.javadsl.Sink;
+import java.nio.file.Path;
+
+public CompletionStage<Long> downloadLargeFile(String url, Path destination) {
+    return ws.url(url)
+        .stream()  // Trả Source thay vì load vào memory
+        .thenCompose(response -> {
+            // Pipe stream đến file - không tốn RAM
+            return response.getBodyAsSource()
+                .runWith(FileIO.toPath(destination), materializer)
+                .thenApply(ioResult -> ioResult.count());
+        });
+}
+```
+
+**Khi nào dùng `stream()`:**
+- Download file > 10MB
+- Response không biết trước kích thước
+- Streaming video/audio
+- Server-Sent Events từ external service
+
+---
+
+## 9. Bài Tập
 
 Xem `ws-client-demo/` trong thư mục này.
 

@@ -206,7 +206,74 @@ public Result show(Http.Request request, Long id) {
 
 ---
 
-## 8. Bài Tập
+## 8. List Parameters (Nhiều Giá Trị Cùng Key)
+
+```
+# Nhận nhiều giá trị cho cùng một query param
+# GET /filter?tags=java&tags=play&tags=async
+GET     /filter     controllers.FilterController.apply(tags: java.util.List[String])
+```
+
+```java
+public Result apply(List<String> tags) {
+    // tags = ["java", "play", "async"]
+    return ok("Tags: " + tags);
+}
+```
+
+---
+
+## 9. Default Controller - Placeholder Routes
+
+Play có `Default` controller built-in để xử lý các trường hợp đặc biệt:
+
+```
+# Redirect
+GET     /old-api    controllers.Default.redirect(to = "/api/v2")
+
+# 404 tường minh
+GET     /deprecated controllers.Default.notFound()
+
+# 500 tường minh
+GET     /crash      controllers.Default.error()
+
+# 200 trống
+GET     /ping       controllers.Default.ok()
+```
+
+---
+
+## 10. Relative Routes (CDN & Proxy)
+
+```java
+// Tạo URL relative so với request hiện tại
+// Hữu ích khi app chạy sau CDN hoặc reverse proxy
+
+Call absoluteCall = controllers.routes.UserController.show(42L);
+Call relativeCall = absoluteCall.relativeTo(request);
+
+// Nếu request đến từ https://cdn.example.com/api/users
+// → relativeCall.url() = "../users/42" (relative path)
+```
+
+---
+
+## 11. nocsrf Modifier - Tắt CSRF Cho Route Cụ Thể
+
+```
+# REST API endpoints dùng JWT không cần CSRF
++ nocsrf
+POST    /api/webhooks    controllers.WebhookController.receive()
+
+# Bình thường (CSRF check)
+POST    /forms/submit   controllers.FormController.submit()
+```
+
+> Xem thêm CSRF trong Day 31.
+
+---
+
+## 12. Bài Tập
 
 Tạo project mới hoặc dùng `hello-play` từ Day 01, thêm:
 
@@ -226,6 +293,6 @@ curl "http://localhost:9000/posts/abc"  # → 404
 curl -v "http://localhost:9000/old-url"  # → 303 redirect
 ```
 
-## File Code Thực Hành
+## 13. File Code Thực Hành
 
 Xem `routing-demo/` trong thư mục này - project Play đầy đủ với tất cả ví dụ trên.

@@ -73,8 +73,49 @@ sbt run
 | 13 | Async Pitfalls | `week-02/Day-13/README.md` |
 | 14 | **Mini Project: Todo API (async)** | `week-02/Day-14/todo-api-async/` |
 
-### Tuần 3-6
-Đọc README của từng ngày và làm bài tập trong đó.
+### Tuần 3: Database & Forms
+| Ngày | Chủ đề | File học |
+|------|--------|---------|
+| 15 | Database Setup (HikariCP + PostgreSQL) | `week-03/Day-15/README.md` |
+| 16 | JPA & Hibernate | `week-03/Day-16/README.md` |
+| 17 | Async JDBC + DatabaseExecutionContext | `week-03/Day-17/README.md` |
+| 18 | Forms & Validation (Bean Validation, cross-field, groups) | `week-03/Day-18/README.md` |
+| 19 | JSON & Jackson | `week-03/Day-19/README.md` |
+| 20 | Connection Pooling | `week-03/Day-20/README.md` |
+| 21 | **Mini Project: CRUD API** | `week-03/Day-21/README.md` |
+
+### Tuần 4: Streaming & WS
+| Ngày | Chủ đề | File học |
+|------|--------|---------|
+| 22 | WS Client (HTTP calls, auth, streaming) | `week-04/Day-22/README.md` |
+| 23 | Pekko Streams Basics | `week-04/Day-23/README.md` |
+| 24 | WebSocket | `week-04/Day-24/README.md` |
+| 25 | Server-Sent Events | `week-04/Day-25/README.md` |
+| 26 | File Upload & Streaming | `week-04/Day-26/README.md` |
+| 27 | Reactive Patterns | `week-04/Day-27/README.md` |
+| 28 | **Mini Project: Realtime** | `week-04/Day-28/README.md` |
+
+### Tuần 5: Security & Testing
+| Ngày | Chủ đề | File học |
+|------|--------|---------|
+| 29 | Filters & Middleware | `week-05/Day-29/README.md` |
+| 30 | Authentication (JWT) | `week-05/Day-30/README.md` |
+| 31 | Authorization & CSRF (annotations, test helper) | `week-05/Day-31/README.md` |
+| 32 | Error Handling (global, JsonHttpErrorHandler) | `week-05/Day-32/README.md` |
+| 33 | Unit Testing (GuiceApplicationBuilder, GuiceInjectorBuilder) | `week-05/Day-33/README.md` |
+| 34 | Integration Testing | `week-05/Day-34/README.md` |
+| 35 | Load Testing | `week-05/Day-35/README.md` |
+
+### Tuần 6: Advanced & Capstone
+| Ngày | Chủ đề | File học |
+|------|--------|---------|
+| 36 | DI Nâng Cao (Lifecycle, Provider, @ImplementedBy, Compile-Time DI) | `week-06/Day-36/README.md` |
+| 37 | Configuration, Logging & **I18N** | `week-06/Day-37/README.md` |
+| 38 | Performance Tuning | `week-06/Day-38/README.md` |
+| 39 | Caching (Named caches, Caffeine) | `week-06/Day-39/README.md` |
+| 40 | Production Build | `week-06/Day-40/README.md` |
+| 41 | Docker Deploy | `week-06/Day-41/README.md` |
+| 42 | **Capstone Project** | `week-06/Day-42/url-shortener/` |
 
 ---
 

@@ -257,7 +257,49 @@ Request Attributes:
 
 ---
 
-## 8. Bài Tập
+## 8. Range Requests - Partial Content (RFC 7233)
+
+Play hỗ trợ HTTP Range requests để serve file theo từng phần (video streaming, download resume):
+
+```java
+import play.mvc.RangeResults;
+import java.io.File;
+import java.nio.file.Path;
+
+public class FileController extends Controller {
+
+    // Serve file với range support (206 Partial Content)
+    public Result serveVideo(Http.Request request) {
+        File videoFile = new File("/var/media/video.mp4");
+
+        // RangeResults tự xử lý Range header → 206 hoặc 200
+        return RangeResults.ofFile(request, videoFile);
+    }
+
+    // Serve từ Path
+    public Result serveLargeFile(Http.Request request) {
+        Path filePath = Path.of("/var/files/large.zip");
+        return RangeResults.ofPath(request, filePath, Optional.of("large.zip"));
+    }
+}
+```
+
+**Khi client gửi:**
+```
+GET /video HTTP/1.1
+Range: bytes=0-1023
+```
+
+**Play trả:**
+```
+HTTP/1.1 206 Partial Content
+Content-Range: bytes 0-1023/5242880
+Content-Length: 1024
+```
+
+---
+
+## 9. Bài Tập
 
 Xem `request-response-demo/` trong thư mục này:
 
