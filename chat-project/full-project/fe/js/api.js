@@ -40,6 +40,10 @@ async function apiFetch(path, options = {}) {
   }
 }
 
+function currentAccountId() {
+  return parseInt(localStorage.getItem('currentAccountId')) || 1;
+}
+
 // ────────────────────────────────────────────────────────────────
 // ACCOUNTS
 // ────────────────────────────────────────────────────────────────
@@ -82,7 +86,7 @@ async function getCurrentAccount() {
 async function getConversations() {
   if (CONFIG.USE_MOCK) return MOCK.conversations;
 
-  const data = await apiFetch('/api/conversations');
+  const data = await apiFetch(`/api/conversations?accountId=${currentAccountId()}`);
   return data ?? MOCK.conversations;
 }
 
@@ -96,15 +100,18 @@ async function getMessages(conversationId) {
     return MOCK.messages[conversationId] ?? [];
   }
 
-  const data = await apiFetch(`/api/conversations/${conversationId}/messages`);
+  const path = conversationId === 'global'
+    ? '/api/global/messages'
+    : `/api/conversations/${conversationId}/messages`;
+  const data = await apiFetch(path);
   return data ?? MOCK.messages[conversationId] ?? [];
 }
 
 /** Gửi tin nhắn (Week 3+: lưu DB, Week 4+: push WebSocket) */
-async function sendMessage(conversationId, text) {
+async function apiSendMessage(conversationId, text) {
   const msg = {
     id: Date.now(),
-    senderId: 0,  // 0 = current user
+    senderId: currentAccountId(),
     text,
     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
   };
@@ -116,7 +123,7 @@ async function sendMessage(conversationId, text) {
     return msg;
   }
 
-  const data = await apiFetch(`/api/conversations/${conversationId}/messages`, {
+  const data = await apiFetch(`/api/conversations/${conversationId}/messages?senderId=${currentAccountId()}`, {
     method: 'POST',
     body: JSON.stringify({ text }),
   });
@@ -135,13 +142,13 @@ async function getSettings() {
       notifications: true,
     };
   }
-  const data = await apiFetch('/api/settings');
+  const data = await apiFetch(`/api/settings?userId=${currentAccountId()}`);
   return data ?? { typingIndicators: true, showOnlineStatus: true, notifications: true };
 }
 
 async function updateSetting(key, value) {
   if (CONFIG.USE_MOCK) return { success: true };
-  return await apiFetch('/api/settings', {
+  return await apiFetch(`/api/settings?userId=${currentAccountId()}`, {
     method: 'PATCH',
     body: JSON.stringify({ [key]: value }),
   }) ?? { success: true };

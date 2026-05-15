@@ -76,6 +76,12 @@ body {
   color: var(--text);
 }
 
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .badge {
   background: var(--primary);
   color: white;
@@ -176,6 +182,13 @@ body {
 
 .conv-item:hover { background: var(--hover); }
 .conv-item.active { background: var(--primary-light); }
+.conv-item.unread {
+  background: #FAFAFF;
+}
+
+.conv-item.unread.active {
+  background: var(--primary-light);
+}
 
 .conv-avatar-wrap { position: relative; flex-shrink: 0; }
 
@@ -198,11 +211,43 @@ body {
   max-width: 180px;
 }
 
+.conv-item.unread .conv-name {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.conv-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
 .conv-time {
   font-size: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
-  margin-left: 8px;
+}
+
+.conv-item.unread .conv-time {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.conv-unread {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .conv-last {
@@ -212,6 +257,11 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-bottom: 6px;
+}
+
+.conv-item.unread .conv-last {
+  color: var(--text);
+  font-weight: 650;
 }
 
 /* Tags */
@@ -590,6 +640,69 @@ body {
   max-height: 80vh;
   overflow-y: auto;
   box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+}
+
+.settings-modal {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 22px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.settings-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row:last-child { border-bottom: none; }
+
+.setting-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.setting-row strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.setting-row small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.setting-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
 }
 
 .account-modal h2 {

@@ -7,7 +7,6 @@ import org.apache.pekko.actor.ActorSystem;
 import org.apache.pekko.stream.Materializer;
 import play.libs.streams.ActorFlow;
 import play.mvc.Controller;
-import play.mvc.Http;
 import play.mvc.WebSocket;
 
 import javax.inject.Inject;
@@ -30,16 +29,22 @@ public class WebSocketController extends Controller {
     }
 
     // GET /ws/chat?accountId=1
-    public WebSocket chat(Http.Request request) {
-        Long accountId = Long.parseLong(
-            request.getQueryString("accountId").orElse("1")
-        );
-
-        return WebSocket.Json.accept(req ->
-            ActorFlow.actorRef(
+    public WebSocket chat() {
+        return WebSocket.Json.accept(request -> {
+            Long accountId = parseLongOrDefault(request.getQueryString("accountId"), 1L);
+            return ActorFlow.actorRef(
                 wsOut -> UserConnectionActor.props(accountId, wsOut, chatRoom),
                 actorSystem, materializer
-            )
-        );
+            );
+        });
+    }
+
+    private Long parseLongOrDefault(String value, Long fallback) {
+        if (value == null || value.isBlank()) return fallback;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 }

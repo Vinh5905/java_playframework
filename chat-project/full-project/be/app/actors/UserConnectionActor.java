@@ -12,6 +12,10 @@ import play.libs.Json;
  * Lifecycle tự động: tạo khi connect, destroy khi disconnect.
  */
 public class UserConnectionActor extends AbstractActor {
+    public static class Outgoing {
+        public final JsonNode payload;
+        public Outgoing(JsonNode payload) { this.payload = payload; }
+    }
 
     private final Long accountId;
     private final ActorRef wsOut;
@@ -50,8 +54,8 @@ public class UserConnectionActor extends AbstractActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
+            .match(Outgoing.class, out -> wsOut.tell(out.payload, self()))
             .match(JsonNode.class, this::handleFromBrowser)
-            .match(ObjectNode.class, msg -> wsOut.tell(msg.toString(), self()))
             .match(String.class, cmd -> {
                 if ("check_heartbeat".equals(cmd)) {
                     long elapsed = System.currentTimeMillis() - lastPingTime;
@@ -80,7 +84,7 @@ public class UserConnectionActor extends AbstractActor {
                 break;
             case "ping":
                 lastPingTime = System.currentTimeMillis();
-                wsOut.tell(Json.newObject().put("type", "pong").toString(), self());
+                wsOut.tell(Json.newObject().put("type", "pong"), self());
                 break;
         }
     }

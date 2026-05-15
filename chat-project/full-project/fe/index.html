@@ -28,7 +28,10 @@
         <span class="sidebar-title">Messages</span>
         <span class="badge" id="unreadBadge">0</span>
       </div>
-      <button class="btn-icon btn-new" onclick="showNewConvModal()" title="New chat">＋</button>
+      <div class="sidebar-actions">
+        <button class="btn-icon" onclick="showSettingsPanel()" title="Settings">⚙</button>
+        <button class="btn-icon btn-new" onclick="showNewConvModal()" title="New chat">＋</button>
+      </div>
     </div>
 
     <!-- Current account bar (click to switch) -->
@@ -101,6 +104,7 @@
           placeholder="Type a message"
           onkeydown="handleInputKeydown(event)"
           oninput="handleTyping()"
+          onblur="stopTyping()"
         />
         <button class="btn-send" id="btnSend" onclick="sendMessage()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -112,6 +116,46 @@
     </div>
   </main>
 
+</div>
+
+<!-- ==================== SETTINGS PANEL ==================== -->
+<div class="overlay" id="settingsOverlay">
+  <div class="settings-modal">
+    <div class="settings-header">
+      <h2>Settings</h2>
+      <button class="btn-icon" onclick="hideSettingsPanel()" title="Close">×</button>
+    </div>
+    <div class="settings-list">
+      <label class="setting-row">
+        <span>
+          <strong>Typing Indicators</strong>
+          <small>Show typing events to other users</small>
+        </span>
+        <input id="settingTyping" type="checkbox" onchange="toggleSetting('typingIndicators', this.checked)" />
+      </label>
+      <label class="setting-row">
+        <span>
+          <strong>Online Status</strong>
+          <small>Show online/offline presence</small>
+        </span>
+        <input id="settingPresence" type="checkbox" onchange="toggleSetting('showOnlineStatus', this.checked)" />
+      </label>
+      <label class="setting-row">
+        <span>
+          <strong>Notifications</strong>
+          <small>Keep notification preference enabled</small>
+        </span>
+        <input id="settingNotifications" type="checkbox" onchange="toggleSetting('notifications', this.checked)" />
+      </label>
+      <label class="setting-row">
+        <span>
+          <strong>Sound</strong>
+          <small>Play sound for new messages</small>
+        </span>
+        <input id="settingSound" type="checkbox" onchange="toggleSetting('soundEnabled', this.checked)" />
+      </label>
+    </div>
+  </div>
 </div>
 
 <!-- Scripts (order matters!) -->

@@ -7,17 +7,16 @@ lazy val root = (project in file("."))
   .enablePlugins(PlayJava, DockerPlugin)
 
 scalaVersion := "2.13.16"
-javacOptions ++= Seq("--release", "21")
+javacOptions ++= Seq("--release", "17")
 
 libraryDependencies ++= Seq(
   guice,
-  jdbc,
+  javaJdbc,
   evolutions,
   ws,
-  ehcache,
   "org.postgresql"  % "postgresql"                      % "42.7.4",
   "org.mongodb"     % "mongodb-driver-reactivestreams"   % "5.1.0",
-  "org.apache.pekko" %% "pekko-stream"                  % "1.1.2",
+  "org.apache.pekko" %% "pekko-stream"                  % "1.0.3",
   "com.auth0"       % "java-jwt"                        % "4.4.0",
   "org.junit.jupiter" % "junit-jupiter-api"             % "5.10.2" % Test,
   "org.junit.jupiter" % "junit-jupiter-engine"          % "5.10.2" % Test,

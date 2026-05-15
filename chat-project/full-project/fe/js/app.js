@@ -17,6 +17,7 @@ const STATE = {
   onlineUsers: new Set(), // Set<userId> đang online
   typingUsers: {},        // { convId: { userId: timeoutId } }
   settings: {},           // User settings
+  botStreams: {},         // { convId: messageId }
 };
 
 // Object APP expose ra để websocket.js gọi vào
@@ -24,6 +25,7 @@ const APP = {
   receiveMessage,
   setTyping,
   setPresence,
+  setPresenceSnapshot,
   appendBotChunk,
 };
 
@@ -35,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 1. Load accounts
   STATE.accounts = await getAccounts();
-  STATE.onlineUsers = new Set(MOCK.onlineUsers);  // Mock: Florencio và Bot online
+  STATE.onlineUsers = new Set();
 
   // 2. Khôi phục account từ localStorage (nếu có)
   const savedId = parseInt(localStorage.getItem('currentAccountId'));
@@ -86,12 +88,16 @@ async function selectAccount(account) {
 
   // Gọi backend để switch session (Week 2+ mới có tác dụng thật)
   await switchAccount(account.id);
+  STATE.onlineUsers = new Set([account.id]);
 
   // Connect WebSocket (Week 4 mới thực sự kết nối)
+  WS.disconnect();
   WS.connect(account.id);
+  WS.connectGlobal(account.id);
 
   hideAccountSwitcher();
   updateCurrentAccountUI();
+  await loadSettings();
   await loadConversations();
 }
 
@@ -116,7 +122,11 @@ function updateCurrentAccountUI() {
 // ────────────────────────────────────────────────────────────────
 
 async function loadConversations() {
-  STATE.conversations = await getConversations();
+  const directConversations = await getConversations();
+  const hasGlobal = directConversations.some(conv => String(conv.id) === 'global');
+  STATE.conversations = hasGlobal
+    ? directConversations
+    : [{ id: 'global', name: 'Global Chat', isGlobal: true, lastMessage: 'Everyone can chat here', lastTime: 'Now', unread: 0, tags: [{ label: 'Global', color: 'blue' }] }, ...directConversations];
   renderConversations(STATE.conversations);
   updateUnreadBadge();
 }
@@ -130,26 +140,33 @@ function renderConversations(convs) {
   }
 
   list.innerHTML = convs.map(conv => {
-    const partner = getAccountById(conv.participantId);
-    if (!partner) return '';
+    const partner = conv.isGlobal ? null : getAccountById(conv.participantId);
+    if (!conv.isGlobal && !partner) return '';
 
-    const isOnline = STATE.onlineUsers.has(partner.id);
-    const isActive = conv.id === STATE.activeConvId;
+    const displayName = conv.isGlobal ? conv.name : partner.name;
+    const isOnline = conv.isGlobal || STATE.onlineUsers.has(partner.id);
+    const isActive = String(conv.id) === String(STATE.activeConvId);
+    const clickArg = JSON.stringify(conv.id).replace(/"/g, '&quot;');
+    const unread = conv.unread || 0;
+    const unreadLabel = unread > 99 ? '99+' : unread;
 
     return `
-      <div class="conv-item ${isActive ? 'active' : ''}" onclick="openConversation(${conv.id})">
+      <div class="conv-item ${isActive ? 'active' : ''} ${unread > 0 ? 'unread' : ''}" onclick="openConversation(${clickArg})">
         <div class="conv-avatar-wrap">
-          ${renderAvatarHTML(partner.name, 'avatar-lg')}
+          ${renderAvatarHTML(displayName, 'avatar-lg')}
           <div class="status-dot ${isOnline ? 'online' : ''}"></div>
         </div>
         <div class="conv-info">
           <div class="conv-top">
-            <span class="conv-name">${partner.name}</span>
-            <span class="conv-time">${conv.lastTime}</span>
+            <span class="conv-name">${escapeHtml(displayName)}</span>
+            <div class="conv-meta">
+              <span class="conv-time">${escapeHtml(String(conv.lastTime || ''))}</span>
+              ${unread > 0 ? `<span class="conv-unread">${unreadLabel}</span>` : ''}
+            </div>
           </div>
-          <div class="conv-last">${conv.lastMessage}</div>
+          <div class="conv-last">${escapeHtml(conv.lastMessage || '')}</div>
           <div class="tags">
-            ${(conv.tags || []).map(t => `<span class="tag tag-${t.color}">${t.label}</span>`).join('')}
+            ${(conv.tags || []).map(t => `<span class="tag tag-${t.color}">${escapeHtml(t.label || '')}</span>`).join('')}
           </div>
         </div>
       </div>
@@ -164,9 +181,10 @@ function filterConversations(query) {
   }
   const q = query.toLowerCase();
   const filtered = STATE.conversations.filter(conv => {
+    if (conv.isGlobal) return conv.name.toLowerCase().includes(q);
     const partner = getAccountById(conv.participantId);
     return partner?.name.toLowerCase().includes(q) ||
-           conv.lastMessage.toLowerCase().includes(q);
+           (conv.lastMessage || '').toLowerCase().includes(q);
   });
   renderConversations(filtered);
 }
@@ -181,11 +199,18 @@ function updateUnreadBadge() {
 // ────────────────────────────────────────────────────────────────
 
 async function openConversation(convId) {
-  STATE.activeConvId = convId;
+  const previousConvId = STATE.activeConvId;
+  if (previousConvId && previousConvId !== String(convId)) {
+    clearTimeout(typingTimer);
+    WS.sendTyping(previousConvId, false);
+  }
 
-  const conv = STATE.conversations.find(c => c.id === convId);
-  const partner = conv ? getAccountById(conv.participantId) : null;
-  if (!partner) return;
+  STATE.activeConvId = String(convId);
+  hideTypingBar();
+
+  const conv = STATE.conversations.find(c => String(c.id) === String(convId));
+  const partner = conv && !conv.isGlobal ? getAccountById(conv.participantId) : null;
+  if (!conv || (!conv.isGlobal && !partner)) return;
 
   // Mark as read
   if (conv) conv.unread = 0;
@@ -197,7 +222,11 @@ async function openConversation(convId) {
   document.getElementById('chatWindow').style.display = 'flex';
 
   // Update header
-  renderChatHeader(partner);
+  if (conv.isGlobal) {
+    renderGlobalHeader();
+  } else {
+    renderChatHeader(partner);
+  }
 
   // Load messages
   if (!STATE.messages[convId]) {
@@ -218,6 +247,17 @@ function renderChatHeader(partner) {
   const statusEl = document.getElementById('chatPartnerStatus');
   statusEl.textContent = isOnline ? 'Online' : 'Offline';
   statusEl.className = `chat-partner-status ${isOnline ? 'online' : ''}`;
+}
+
+function renderGlobalHeader() {
+  const avatarEl = document.getElementById('chatPartnerAvatar');
+  avatarEl.style.background = '#2563EB';
+  avatarEl.textContent = 'GC';
+
+  document.getElementById('chatPartnerName').textContent = 'Global Chat';
+  const statusEl = document.getElementById('chatPartnerStatus');
+  statusEl.textContent = `${STATE.onlineUsers.size} online`;
+  statusEl.className = 'chat-partner-status online';
 }
 
 function renderMessages() {
@@ -246,9 +286,11 @@ function renderMessages() {
     const senderAcc = group.isSent ? STATE.currentAccount : getAccountById(group.senderId);
     const lastMsg = group.messages[group.messages.length - 1];
 
-    const bubbles = group.messages.map(msg =>
-      `<div class="msg-bubble">${escapeHtml(msg.text)}</div>`
-    ).join('');
+    const bubbles = group.messages.map(msg => `
+      <div class="msg-bubble">
+        ${escapeHtml(msg.text || '')}${msg.isStreaming ? '<span class="streaming-cursor"></span>' : ''}
+      </div>
+    `).join('');
 
     const avatarHtml = senderAcc
       ? renderAvatarHTML(senderAcc.name, 'avatar-msg')
@@ -276,7 +318,18 @@ async function sendMessage() {
 
   input.value = '';
 
-  const msg = await sendMessage_api(STATE.activeConvId, text);
+  const sentViaWs = STATE.activeConvId === 'global'
+    ? WS.sendGlobalMessage(text)
+    : WS.sendMessage(STATE.activeConvId, text);
+
+  const msg = sentViaWs
+    ? {
+        id: Date.now(),
+        senderId: STATE.currentAccount?.id || 0,
+        text,
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      }
+    : await apiSendMessage(STATE.activeConvId, text);
 
   // Thêm vào state ngay (optimistic update)
   if (!STATE.messages[STATE.activeConvId]) {
@@ -292,27 +345,24 @@ async function sendMessage() {
   renderMessages();
 
   // Update conversation preview
-  const conv = STATE.conversations.find(c => c.id === STATE.activeConvId);
+  const conv = STATE.conversations.find(c => String(c.id) === STATE.activeConvId);
   if (conv) {
     conv.lastMessage = text;
     conv.lastTime = 'Just now';
+    moveConversationToTop(STATE.activeConvId);
     renderConversations(STATE.conversations);
   }
 
   // Stop typing indicator
+  clearTimeout(typingTimer);
   WS.sendTyping(STATE.activeConvId, false);
 
   // Auto reply từ bot (mock - Week 7 sẽ có OpenAI)
-  const partner = STATE.conversations.find(c => c.id === STATE.activeConvId);
+  const partner = STATE.conversations.find(c => String(c.id) === STATE.activeConvId);
   const partnerAcc = partner ? getAccountById(partner.participantId) : null;
-  if (partnerAcc?.isBot && CONFIG.USE_MOCK) {
+  if (partnerAcc?.isBot && !sentViaWs) {
     simulateBotReply(STATE.activeConvId, partnerAcc);
   }
-}
-
-// Avoid name collision with api.js sendMessage
-async function sendMessage_api(convId, text) {
-  return await sendMessage(convId, text);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -320,32 +370,97 @@ async function sendMessage_api(convId, text) {
 // ────────────────────────────────────────────────────────────────
 
 function receiveMessage(convId, message) {
-  if (!STATE.messages[convId]) STATE.messages[convId] = [];
-  STATE.messages[convId].push(message);
+  const key = String(convId);
+  if (!STATE.messages[key]) STATE.messages[key] = [];
+  STATE.messages[key].push(message);
 
-  if (convId === STATE.activeConvId) {
+  const conv = ensureConversationForIncoming(key, message);
+  if (conv) {
+    conv.lastMessage = message.text || '';
+    conv.lastTime = message.time || 'Just now';
+    if (key !== STATE.activeConvId) {
+      conv.unread = (conv.unread || 0) + 1;
+    }
+    moveConversationToTop(key);
+  }
+
+  if (key === STATE.activeConvId) {
     renderMessages();
+    updateUnreadBadge();
+    renderConversations(STATE.conversations);
   } else {
-    // Update unread count
-    const conv = STATE.conversations.find(c => c.id === convId);
-    if (conv) { conv.unread = (conv.unread || 0) + 1; }
     updateUnreadBadge();
     renderConversations(STATE.conversations);
   }
 }
 
+function ensureConversationForIncoming(convId, message) {
+  let conv = STATE.conversations.find(c => String(c.id) === convId);
+  if (conv) return conv;
+
+  const senderId = message?.senderId;
+  if (!senderId || senderId === STATE.currentAccount?.id) return null;
+
+  const sender = getAccountById(senderId);
+  conv = {
+    id: convId,
+    participantId: senderId,
+    isGlobal: false,
+    lastMessage: message.text || '',
+    lastTime: message.time || 'Just now',
+    unread: 0,
+    tags: [{ label: sender?.isBot ? 'Bot' : 'Direct', color: sender?.isBot ? 'purple' : 'gray' }],
+  };
+  STATE.conversations.unshift(conv);
+  return conv;
+}
+
+function moveConversationToTop(convId) {
+  const key = String(convId);
+  const index = STATE.conversations.findIndex(c => String(c.id) === key);
+  if (index < 0) return;
+
+  const conv = STATE.conversations[index];
+  if (conv.isGlobal) return;
+
+  STATE.conversations.splice(index, 1);
+  const insertAt = STATE.conversations[0]?.isGlobal ? 1 : 0;
+  STATE.conversations.splice(insertAt, 0, conv);
+}
+
 function setTyping(convId, userId, isTyping) {
-  if (convId !== STATE.activeConvId) return;
-  const partner = getAccountById(userId);
+  const key = String(convId);
+  if (!STATE.typingUsers[key]) STATE.typingUsers[key] = {};
+
+  clearTimeout(STATE.typingUsers[key][userId]);
+  if (isTyping) {
+    STATE.typingUsers[key][userId] = setTimeout(() => {
+      setTyping(key, userId, false);
+    }, CONFIG.TYPING_DEBOUNCE_MS + 1000);
+  } else {
+    delete STATE.typingUsers[key][userId];
+  }
+
+  if (key !== STATE.activeConvId) return;
+
+  const typingUserId = Object.keys(STATE.typingUsers[key] || {})[0];
+  const partner = typingUserId ? getAccountById(Number(typingUserId)) : null;
   const bar = document.getElementById('typingBar');
   const txt = document.getElementById('typingText');
 
-  if (isTyping && partner) {
+  if (partner) {
     txt.textContent = `${partner.name} is typing...`;
     bar.style.display = 'flex';
   } else {
-    bar.style.display = 'none';
+    hideTypingBar();
   }
+}
+
+function hideTypingBar() {
+  const bar = document.getElementById('typingBar');
+  const txt = document.getElementById('typingText');
+  if (bar) bar.style.display = 'none';
+  if (txt) txt.textContent = '';
 }
 
 function setPresence(userId, status) {
@@ -359,16 +474,72 @@ function setPresence(userId, status) {
   renderConversations(STATE.conversations);
 
   // Update header if current chat partner
-  const conv = STATE.conversations.find(c => c.id === STATE.activeConvId);
+  const conv = STATE.conversations.find(c => String(c.id) === STATE.activeConvId);
   if (conv && conv.participantId === userId) {
     const partner = getAccountById(userId);
+    if (partner) renderChatHeader(partner);
+  }
+
+  if (conv && conv.isGlobal) {
+    renderGlobalHeader();
+  }
+}
+
+function setPresenceSnapshot(onlineUsers) {
+  STATE.onlineUsers = new Set((onlineUsers || []).map(id => Number(id)));
+  renderConversations(STATE.conversations);
+
+  const conv = STATE.conversations.find(c => String(c.id) === STATE.activeConvId);
+  if (conv?.isGlobal) {
+    renderGlobalHeader();
+  } else if (conv?.participantId) {
+    const partner = getAccountById(conv.participantId);
     if (partner) renderChatHeader(partner);
   }
 }
 
 function appendBotChunk(convId, chunk, isDone) {
-  // Week 7: streaming bot response
-  // For now, no-op
+  const key = String(convId);
+  if (!STATE.messages[key]) STATE.messages[key] = [];
+
+  let messageId = STATE.botStreams[key];
+  let message = messageId ? STATE.messages[key].find(m => m.id === messageId) : null;
+  let createdNewMessage = false;
+  if (!message) {
+    messageId = `bot-${Date.now()}`;
+    message = {
+      id: messageId,
+      senderId: 9,
+      text: '',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      isStreaming: true,
+    };
+    STATE.botStreams[key] = messageId;
+    STATE.messages[key].push(message);
+    createdNewMessage = true;
+  }
+
+  if (chunk) message.text += chunk;
+  if (isDone) {
+    message.isStreaming = false;
+    delete STATE.botStreams[key];
+  }
+
+  const conv = STATE.conversations.find(c => String(c.id) === key);
+  if (conv) {
+    conv.lastMessage = message.text || 'Bot is typing...';
+    conv.lastTime = message.time || 'Just now';
+    if (createdNewMessage && key !== STATE.activeConvId) {
+      conv.unread = (conv.unread || 0) + 1;
+    }
+    moveConversationToTop(key);
+    updateUnreadBadge();
+    renderConversations(STATE.conversations);
+  }
+
+  if (key === STATE.activeConvId) {
+    renderMessages();
+  }
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -378,12 +549,64 @@ let typingTimer = null;
 
 function handleTyping() {
   if (!STATE.activeConvId) return;
-  WS.sendTyping(STATE.activeConvId, true);
-
+  const convId = STATE.activeConvId;
+  const input = document.getElementById('msgInput');
   clearTimeout(typingTimer);
+
+  if (STATE.settings.typingIndicators === false || !input.value.trim()) {
+    WS.sendTyping(convId, false);
+    return;
+  }
+
+  WS.sendTyping(convId, true);
   typingTimer = setTimeout(() => {
-    WS.sendTyping(STATE.activeConvId, false);
+    WS.sendTyping(convId, false);
   }, CONFIG.TYPING_DEBOUNCE_MS);
+}
+
+function stopTyping() {
+  if (!STATE.activeConvId) return;
+  clearTimeout(typingTimer);
+  WS.sendTyping(STATE.activeConvId, false);
+}
+
+// ────────────────────────────────────────────────────────────────
+// SETTINGS
+// ────────────────────────────────────────────────────────────────
+
+async function loadSettings() {
+  STATE.settings = await getSettings();
+  renderSettings();
+}
+
+function renderSettings() {
+  const settings = {
+    typingIndicators: true,
+    showOnlineStatus: true,
+    notifications: true,
+    soundEnabled: true,
+    ...STATE.settings,
+  };
+
+  document.getElementById('settingTyping').checked = settings.typingIndicators;
+  document.getElementById('settingPresence').checked = settings.showOnlineStatus;
+  document.getElementById('settingNotifications').checked = settings.notifications;
+  document.getElementById('settingSound').checked = settings.soundEnabled;
+}
+
+function showSettingsPanel() {
+  renderSettings();
+  document.getElementById('settingsOverlay').classList.add('visible');
+}
+
+function hideSettingsPanel() {
+  document.getElementById('settingsOverlay').classList.remove('visible');
+}
+
+async function toggleSetting(key, value) {
+  STATE.settings = { ...STATE.settings, [key]: value };
+  await updateSetting(key, value);
+  renderSettings();
 }
 
 function handleInputKeydown(event) {

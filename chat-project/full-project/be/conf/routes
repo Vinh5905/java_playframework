@@ -10,7 +10,7 @@ POST    /api/accounts/switch/:id        controllers.AccountController.switchTo(i
 GET     /api/presence                   controllers.AccountController.presence()
 
 # Conversations & Messages
-GET     /api/conversations                                  controllers.ConversationController.list()
+GET     /api/conversations                                  controllers.ConversationController.list(accountId: Long ?= 1)
 GET     /api/conversations/:convId/messages                 controllers.MessageController.getMessages(convId: String, limit: Int ?= 20)
 POST    /api/conversations/:convId/messages                 controllers.MessageController.sendMessage(convId: String, request: Request)
 
@@ -18,9 +18,9 @@ POST    /api/conversations/:convId/messages                 controllers.MessageC
 GET     /api/global/messages            controllers.GlobalChatController.history(limit: Int ?= 50)
 
 # Settings
-GET     /api/settings                   controllers.SettingsController.getSettings(userId: Long)
-PATCH   /api/settings                   controllers.SettingsController.updateSetting(userId: Long, request: Request)
+GET     /api/settings                   controllers.SettingsController.getSettings(userId: Long ?= 1)
+PATCH   /api/settings                   controllers.SettingsController.updateSetting(userId: Long ?= 1, request: Request)
 
 # WebSocket
-GET     /ws/chat                        controllers.WebSocketController.chat(request: Request)
-GET     /ws/global                      controllers.GlobalChatController.join(request: Request)
+GET     /ws/chat                        controllers.WebSocketController.chat()
+GET     /ws/global                      controllers.GlobalChatController.join()

@@ -15,8 +15,8 @@ const CONFIG = {
   WS_BASE: 'ws://localhost:9000',
 
   // true  = dùng mock data ngay (backend chưa cần chạy)
-  // false = luôn gọi API, không fallback về mock
-  USE_MOCK: true,
+  // false = gọi backend thật, api.js vẫn fallback mock nếu server offline
+  USE_MOCK: false,
 
   // Số ms chờ trước khi coi API là offline và fallback về mock
   API_TIMEOUT_MS: 2000,

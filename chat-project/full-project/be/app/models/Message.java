@@ -1,19 +1,19 @@
 package models;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 public class Message {
+    private static final DateTimeFormatter TIME_FORMAT =
+        DateTimeFormatter.ofPattern("hh:mm a").withZone(ZoneId.systemDefault());
+
     public String id;
-
-    @JsonProperty("conversation_id")
     public String conversationId;
-
-    @JsonProperty("sender_id")
     public Long senderId;
-
     public String text;
     public Instant timestamp;
+    public String time;
 
     public Message() {}
 
@@ -22,5 +22,6 @@ public class Message {
         this.senderId = senderId;
         this.text = text;
         this.timestamp = Instant.now();
+        this.time = TIME_FORMAT.format(this.timestamp);
     }
 }

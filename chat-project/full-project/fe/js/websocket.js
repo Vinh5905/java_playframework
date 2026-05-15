@@ -15,39 +15,89 @@
 
 const WS = {
   connection: null,
+  globalConnection: null,
   reconnectTimer: null,
+  globalReconnectTimer: null,
+  pingTimer: null,
+  globalPingTimer: null,
   reconnectDelay: 3000,  // ms
+  pingInterval: 25000,   // ms
+  accountId: null,
 
   /** Kết nối WebSocket sau khi user đã chọn account */
   connect(accountId) {
-    // Week 1-3: WebSocket chưa implement → skip
-    // Uncomment khi có backend WS (Week 4)
-    /*
+    this.accountId = accountId;
+    if (this.connection) this.connection.close();
+
     const url = `${CONFIG.WS_BASE}/ws/chat?accountId=${accountId}`;
     console.log(`[WS] Connecting to ${url}`);
 
     this.connection = new WebSocket(url);
+    const socket = this.connection;
 
-    this.connection.onopen = () => {
+    socket.onopen = () => {
       console.log('[WS] Connected!');
       clearTimeout(this.reconnectTimer);
+      clearInterval(this.pingTimer);
+      this.pingTimer = setInterval(() => {
+        if (this.connection === socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, this.pingInterval);
     };
 
-    this.connection.onmessage = (event) => {
+    socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       this.handleMessage(data);
     };
 
-    this.connection.onclose = () => {
+    socket.onclose = () => {
+      if (this.connection !== socket) return;
+      clearInterval(this.pingTimer);
       console.warn('[WS] Disconnected. Reconnecting in', this.reconnectDelay, 'ms...');
       this.reconnectTimer = setTimeout(() => this.connect(accountId), this.reconnectDelay);
     };
 
-    this.connection.onerror = (err) => {
+    socket.onerror = (err) => {
       console.error('[WS] Error:', err);
     };
-    */
-    console.log('[WS] WebSocket sẽ được implement ở Tuần 4');
+  },
+
+  connectGlobal(accountId) {
+    if (this.globalConnection) this.globalConnection.close();
+
+    const url = `${CONFIG.WS_BASE}/ws/global?accountId=${accountId}`;
+    console.log(`[WS] Connecting global room to ${url}`);
+
+    this.globalConnection = new WebSocket(url);
+    const socket = this.globalConnection;
+
+    socket.onopen = () => {
+      console.log('[WS] Global connected!');
+      clearTimeout(this.globalReconnectTimer);
+      clearInterval(this.globalPingTimer);
+      this.globalPingTimer = setInterval(() => {
+        if (this.globalConnection === socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, this.pingInterval);
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      this.handleMessage(data);
+    };
+
+    socket.onclose = () => {
+      if (this.globalConnection !== socket) return;
+      clearInterval(this.globalPingTimer);
+      console.warn('[WS] Global disconnected. Reconnecting in', this.reconnectDelay, 'ms...');
+      this.globalReconnectTimer = setTimeout(() => this.connectGlobal(accountId), this.reconnectDelay);
+    };
+
+    socket.onerror = (err) => {
+      console.error('[WS] Global error:', err);
+    };
   },
 
   /** Xử lý message nhận được từ server */
@@ -68,9 +118,17 @@ const WS = {
         APP.setPresence(data.userId, data.status);
         break;
 
+      case 'presence_snapshot':
+        APP.setPresenceSnapshot(data.onlineUsers || []);
+        break;
+
       case 'bot_chunk':
         // Bot streaming (Week 7)
         APP.appendBotChunk(data.convId, data.chunk, data.isDone);
+        break;
+
+      case 'global_message':
+        APP.receiveMessage('global', data.message);
         break;
 
       default:
@@ -82,9 +140,26 @@ const WS = {
   send(data) {
     if (!this.connection || this.connection.readyState !== WebSocket.OPEN) {
       // WS chưa kết nối → thử qua REST API fallback
-      return;
+      return false;
     }
     this.connection.send(JSON.stringify(data));
+    return true;
+  },
+
+  sendGlobal(data) {
+    if (!this.globalConnection || this.globalConnection.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+    this.globalConnection.send(JSON.stringify(data));
+    return true;
+  },
+
+  sendMessage(convId, text) {
+    return this.send({ type: 'message', convId, text });
+  },
+
+  sendGlobalMessage(text) {
+    return this.sendGlobal({ type: 'message', text });
   },
 
   /** Gửi typing indicator */
@@ -95,9 +170,16 @@ const WS = {
   /** Đóng kết nối */
   disconnect() {
     clearTimeout(this.reconnectTimer);
+    clearTimeout(this.globalReconnectTimer);
+    clearInterval(this.pingTimer);
+    clearInterval(this.globalPingTimer);
     if (this.connection) {
       this.connection.close();
       this.connection = null;
+    }
+    if (this.globalConnection) {
+      this.globalConnection.close();
+      this.globalConnection = null;
     }
   },
 };

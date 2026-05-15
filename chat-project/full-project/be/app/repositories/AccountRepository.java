@@ -3,20 +3,25 @@ package repositories;
 import models.Account;
 import org.apache.pekko.actor.ActorSystem;
 import play.db.Database;
+import services.SeedData;
 import scala.concurrent.ExecutionContext;
 import scala.concurrent.ExecutionContextExecutor;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 @Singleton
 public class AccountRepository {
+
+    private static final AtomicLong FALLBACK_CURRENT_ACCOUNT_ID = new AtomicLong(1L);
 
     private final Database db;
     private final ExecutionContext dbEc;
@@ -39,7 +44,7 @@ public class AccountRepository {
                 return list;
             }),
             (ExecutionContextExecutor) dbEc
-        );
+        ).exceptionally(t -> SeedData.accounts());
     }
 
     public CompletionStage<Optional<Account>> findById(Long id) {
@@ -53,7 +58,9 @@ public class AccountRepository {
                 }
             }),
             (ExecutionContextExecutor) dbEc
-        );
+        ).exceptionally(t -> SeedData.accounts().stream()
+            .filter(account -> account.id.equals(id))
+            .findFirst());
     }
 
     public CompletionStage<Long> getCurrentAccountId() {
@@ -66,7 +73,7 @@ public class AccountRepository {
                 }
             }),
             (ExecutionContextExecutor) dbEc
-        );
+        ).exceptionally(t -> FALLBACK_CURRENT_ACCOUNT_ID.get());
     }
 
     public CompletionStage<Void> setCurrentAccountId(Long accountId) {
@@ -75,15 +82,26 @@ public class AccountRepository {
                 try (var ps = conn.prepareStatement(
                     "UPDATE app_state SET value = ? WHERE key = 'current_account_id'")) {
                     ps.setString(1, accountId.toString());
-                    ps.executeUpdate();
+                    int updated = ps.executeUpdate();
+                    if (updated == 0) {
+                        try (var insert = conn.prepareStatement(
+                            "INSERT INTO app_state (key, value) VALUES ('current_account_id', ?)")) {
+                            insert.setString(1, accountId.toString());
+                            insert.executeUpdate();
+                        }
+                    }
+                    FALLBACK_CURRENT_ACCOUNT_ID.set(accountId);
                     return null;
                 }
             }),
             (ExecutionContextExecutor) dbEc
-        );
+        ).exceptionally(t -> {
+            FALLBACK_CURRENT_ACCOUNT_ID.set(accountId);
+            return null;
+        });
     }
 
-    private Account mapRow(ResultSet rs) throws Exception {
+    private Account mapRow(ResultSet rs) throws SQLException {
         return new Account(
             rs.getLong("id"),
             rs.getString("name"),
